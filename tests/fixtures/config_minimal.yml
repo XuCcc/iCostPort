@@ -1,0 +1,17 @@
+categories:
+  餐饮:
+    - 三餐
+
+processing:
+  dedupe:
+    enabled: true
+    on_duplicate: keep_first
+  filter: {}
+
+rules:
+  - keywords: ["麦当劳"]
+    primary: 餐饮
+    secondary: 三餐
+
+ai:
+  enabled: false

@@ -1,21 +1,48 @@
 ---
-description: iCostPort 项目约定 — 代码注释与文档字符串使用中文
-globs: "**/*.py"
+description: iCostPort 项目规则（流水线、配置字段、格式扩展与测试）
+globs: "**/*"
 alwaysApply: true
 ---
 
 # iCostPort 项目规则
 
-## 注释语言
+## 注释与文档
 
 - 所有 **Python 注释**（`#` 行注释、块说明）使用 **简体中文**。
-- 所有 **文档字符串**（模块、类、函数的 docstring）使用 **简体中文**。
-- 已有英文注释在修改相关代码时，改为中文或补充中文说明，保持与周围一致。
+- 所有 **Python docstring**（模块、类、函数）使用 **简体中文**。
+- 修改已有英文注释时，优先改为中文或补充中文说明，与周围风格保持一致。
 
-## 代码标识符
+## 流水线阶段约束
 
-- **标识符**（模块名、变量、函数、类名等）保持项目既有风格；与标准库或第三方 API 一致的名称保持英文，不强行翻译。
+- CLI 只负责参数解析和编排，不在 `cli.py` 中堆叠业务逻辑。
+- 端到端流水线顺序固定为：`parse_all -> merge -> processing -> categorize -> write_icost`。
+- `processing` 至少包含：`dedupe`（按日+金额固定键）、`filter`、`organize/sort`。
+- `categorize` 固定顺序：先 `rules`，再 `ai_categorize`（仅对未归类项或受配置约束）。
+- 新增解析器时，不得改动流水线公共接口（输入/输出保持 `Transaction` 列表语义）。
 
-## 例外
+## config 字段约束
 
-- 法律许可头、必须从上游保留的英文注释、或工具强制生成的片段可保留原样，并在旁用中文说明（如需要）。
+- 配置统一来自 `config.yml`（或 `--config` 指定文件），由 `core/settings.py` 负责加载与校验。
+- `categories` 是封闭分类集：一级 -> 二级列表；`rules` 和 AI 输出都必须落在白名单内。
+- `processing.dedupe.on_duplicate` 仅允许 `keep_first` / `keep_last`。
+- `rules` 结构固定：`keywords`（非空列表）+ `primary` + `secondary`。
+- `ai` 至少支持：`enabled`、`provider`、`base_url`、`model`、`api_key_env`、`only_if_uncategorized`、`max_items`、`timeout`。
+- 不要把敏感密钥硬编码进仓库文件；优先通过环境变量读取。
+
+## 新增账单格式（sources）要求
+
+- 每新增一种源格式，必须在 `src/icostport/sources/` 新建解析器模块并实现统一解析函数。
+- 必须在 `src/icostport/sources/registry.py` 完成注册（扩展名或其他约定入口）。
+- 解析器输出必须规范化到 `Transaction`，并保证关键字段可用于后续去重、过滤、归类与写出。
+
+## 测试要求
+
+- 每新增一种源格式，必须同时新增对应 fixture（放在 `tests/fixtures/`）。
+- 每新增一种源格式，必须新增对应单测（建议 `tests/test_sources/test_xxx.py`）。
+- 至少覆盖：基本解析成功、金额/日期解析、异常输入处理、注册后可被流水线选中。
+- CLI 改动必须包含 `tests/test_cli.py` 的回归用例（可用 `Click CliRunner` 或 subprocess 调 `icostport`）。
+
+## 标识符与例外
+
+- 标识符（模块名、变量、函数、类名）保持项目既有英文风格；与标准库/第三方 API 一致的命名不翻译。
+- 法律许可头、上游强制保留文本、自动生成片段可保留英文；必要时补充中文说明。
