@@ -43,12 +43,12 @@ def run(
 
     txs = merge_lists(partitions)
 
-    dedupe_cfg = settings.processing.get("dedupe") or {}
-    if dedupe_cfg.get("enabled", True):
-        on_dup = str(dedupe_cfg.get("on_duplicate", "keep_first"))
+    dedupe_cfg = settings.processing.dedupe
+    if dedupe_cfg.enabled:
+        on_dup = dedupe_cfg.on_duplicate
         txs = dedupe_transactions(txs, on_duplicate=on_dup)
 
-    filt = settings.processing.get("filter") or {}
+    filt = settings.processing.filter or {}
     txs = apply_filters(txs, filt)
 
     txs = sort_by_time(txs)

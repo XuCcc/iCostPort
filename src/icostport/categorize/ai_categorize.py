@@ -18,7 +18,7 @@ def run_ai_categorize(transactions: list[Transaction], settings: Settings) -> No
     当前为骨架：仅记录日志，不接 API；后续在 :mod:`icostport.ai.client` 中接入。
     """
     ai_cfg = settings.ai
-    if not ai_cfg.get("enabled"):
+    if not ai_cfg.enabled:
         return
 
     pending = [tx for tx in transactions if tx.primary_category is None]
@@ -26,7 +26,7 @@ def run_ai_categorize(transactions: list[Transaction], settings: Settings) -> No
     if not pending:
         return
 
-    max_items = int(ai_cfg.get("max_items", 0) or 0)
+    max_items = ai_cfg.max_items
     if max_items > 0:
         pending = pending[:max_items]
 

@@ -1,0 +1,42 @@
+categories:
+  餐饮:
+    - 三餐
+    - 夜宵
+  交通:
+    - 公交地铁
+    - 打车
+  购物:
+    - 日用品
+    - 数码
+
+rules:
+  - keywords: ["麦当劳", "肯德基", "餐厅", "外卖"]
+    primary: 餐饮
+    secondary: 三餐
+  - keywords: ["夜宵", "烧烤"]
+    primary: 餐饮
+    secondary: 夜宵
+  - keywords: ["地铁", "公交"]
+    primary: 交通
+    secondary: 公交地铁
+  - keywords: ["滴滴", "出租车"]
+    primary: 交通
+    secondary: 打车
+
+processing:
+  dedupe:
+    enabled: true
+    on_duplicate: keep_first
+  filter:
+    min_amount: 0.01
+    excluded_keywords: ["测试数据"]
+
+ai:
+  enabled: false
+  provider: openai
+  base_url: https://api.openai.com/v1
+  model: gpt-5-mini
+  api_key_env: OPENAI_API_KEY
+  only_if_uncategorized: true
+  max_items: 50
+  timeout: 30

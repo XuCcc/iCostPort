@@ -33,7 +33,10 @@ def cli(ctx: click.Context, verbose: bool) -> None:
     "--config",
     type=click.Path(exists=True, path_type=Path),
     default=None,
-    help="YAML 配置文件路径；省略则使用内置最小默认配置。",
+    help=(
+        "YAML 配置文件路径；省略时按顺序查找 "
+        "ICOSTPORT_CONFIG -> ./config.yml -> ~/.config/icostport/config.yml。"
+    ),
 )
 @click.option(
     "-o",

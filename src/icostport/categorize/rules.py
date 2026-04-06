@@ -46,17 +46,9 @@ def apply_keyword_rules(transactions: list[Transaction], settings: Settings) -> 
             continue
         note_l = tx.note.lower()
         for rule in settings.rules:
-            if not isinstance(rule, dict):
-                continue
-            kws = rule.get("keywords") or []
-            if not isinstance(kws, list):
-                continue
-            primary = rule.get("primary")
-            secondary = rule.get("secondary")
-            if primary is None or secondary is None:
-                continue
-            p, s = str(primary), str(secondary)
-            if not any(str(k).lower() in note_l for k in kws):
+            kws = rule.keywords
+            p, s = rule.primary, rule.secondary
+            if not any(k.lower() in note_l for k in kws):
                 continue
             if not is_allowed_pair(p, s, pairs, nonempty):
                 logger.warning(
