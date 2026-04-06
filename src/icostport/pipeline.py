@@ -17,7 +17,7 @@ from icostport.processing.dedupe import dedupe_transactions
 from icostport.processing.filter import apply_filters
 from icostport.processing.merge import merge_lists
 from icostport.processing.organize import sort_by_time
-from icostport.sources.registry import parse_path
+from icostport.sources.registry import resolve_parser
 
 # 确保内置解析器完成注册
 import icostport.sources.example_csv  # noqa: F401
@@ -37,9 +37,19 @@ def run(
     settings = load_settings(config)
 
     partitions: list[list[Transaction]] = []
+    skipped = 0
     for p in input_paths:
+        parser = resolve_parser(p)
+        if parser is None:
+            skipped += 1
+            logger.warning("跳过未识别文件: {}（可在 sources 中新增探测器或扩展名注册）", p)
+            continue
+
         logger.info("解析: {}", p)
-        partitions.append(parse_path(p))
+        partitions.append(parser(p))
+
+    if skipped:
+        logger.warning("共跳过 {} 个未识别文件，继续处理其余输入。", skipped)
 
     txs = merge_lists(partitions)
 

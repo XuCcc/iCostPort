@@ -8,7 +8,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from icostport.core.model import Transaction
-from icostport.sources.registry import register_parser
+from icostport.sources.registry import register_detector, register_parser
 
 
 def _parse_datetime(value: str) -> datetime:
@@ -74,4 +74,24 @@ def parse_example_csv(path: Path) -> list[Transaction]:
     return out
 
 
+def detect_example_csv_by_name(path: Path) -> bool:
+    """通过文件名关键字识别示例 CSV。"""
+    stem = path.stem.lower()
+    return "sample_bank_a" in stem or "example" in stem
+
+
+def detect_example_csv_by_content(path: Path) -> bool:
+    """通过表头必需列识别示例 CSV。"""
+    required = {"date", "amount", "type"}
+    with path.open(encoding="utf-8-sig", newline="") as f:
+        reader = csv.reader(f)
+        header = next(reader, None)
+    if not header:
+        return False
+    normalized = {col.strip().lower() for col in header if col and col.strip()}
+    return required.issubset(normalized)
+
+
+register_detector(detect_example_csv_by_name, parse_example_csv, stage="filename")
+register_detector(detect_example_csv_by_content, parse_example_csv, stage="content")
 register_parser("csv", parse_example_csv)
