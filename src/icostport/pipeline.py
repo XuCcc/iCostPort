@@ -20,7 +20,7 @@ from icostport.processing.organize import sort_by_time
 from icostport.sources.registry import resolve_parser
 
 # 确保内置解析器完成注册
-import icostport.sources.example_csv  # noqa: F401
+import icostport.sources  # noqa: F401
 
 
 def run(

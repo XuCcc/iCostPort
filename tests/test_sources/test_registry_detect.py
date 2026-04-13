@@ -83,16 +83,3 @@ def test_resolve_parser_returns_none_when_no_detector_and_no_fallback(
 
     with pytest.raises(ParserNotFoundError):
         registry.parse_path(unknown)
-
-
-def test_example_csv_can_be_detected_by_content_without_extension(fixtures_dir: Path) -> None:
-    """example_csv 的内容探测应支持无后缀输入。"""
-    # 导入模块触发注册副作用
-    import icostport.sources.example_csv  # noqa: F401
-
-    source = fixtures_dir / "sample_detectable_noext"
-    parser = registry.resolve_parser(source)
-    assert parser is not None
-    txs = parser(source)
-    assert len(txs) == 1
-    assert txs[0].amount == Decimal("12.00")

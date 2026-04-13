@@ -15,7 +15,7 @@ def test_convert_command_invokes_pipeline_with_expected_args(
     tmp_path: Path,
 ) -> None:
     """convert 子命令应将参数原样编排后传入 pipeline.run。"""
-    sample_file = fixtures_dir / "sample_bank_a.csv"
+    sample_file = fixtures_dir / "京东账单_sample.csv"
     config_file = fixtures_dir / "config_minimal.yml"
     output_file = tmp_path / "out.xlsx"
 
@@ -62,7 +62,7 @@ def test_convert_command_accepts_multiple_input_paths(
     tmp_path: Path,
 ) -> None:
     """convert 子命令应支持多输入路径。"""
-    input_a = fixtures_dir / "sample_bank_a.csv"
+    input_a = fixtures_dir / "美团账单_sample.csv"
     input_b = tmp_path / "sample_b.csv"
     input_b.write_text(
         "date,amount,type\n2026-01-02 09:00:00,66.00,支出\n",
