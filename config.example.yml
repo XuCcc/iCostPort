@@ -22,6 +22,9 @@ rules:
   - keywords: ["滴滴", "出租车"]
     primary: 交通
     secondary: 打车
+    tags:
+      - A
+      - B
 
 processing:
   dedupe:

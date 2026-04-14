@@ -33,17 +33,27 @@ def is_allowed_pair(
     return (primary, secondary) in allowed
 
 
+def _merge_tags(existing: str, tags: list[str]) -> str:
+    """将规则标签合并为 #tag1#tag2 形式，保持顺序并去重。"""
+    if not tags:
+        return existing
+
+    existed = [t for t in existing.split("#") if t]
+    for tag in tags:
+        if tag not in existed:
+            existed.append(tag)
+    return "".join(f"#{t}" for t in existed)
+
+
 def apply_keyword_rules(transactions: list[Transaction], settings: Settings) -> None:
     """
-    按 ``settings.rules`` 顺序匹配：``keywords`` 在 ``note`` 中子串命中（大小写不敏感）则写入一级/二级。
+    按 ``settings.rules`` 顺序匹配：``keywords`` 在 ``note`` 中子串命中（大小写不敏感）则写入一级/二级和 tags。
     若 ``categories`` 非空，则校验 (primary, secondary) 须在白名单内，否则记警告并跳过该条规则结果。
     """
     pairs = build_category_pairs(settings.categories)
     nonempty = bool(settings.categories)
 
     for tx in transactions:
-        if tx.primary_category is not None:
-            continue
         note_l = tx.note.lower()
         for rule in settings.rules:
             kws = rule.keywords
@@ -57,6 +67,7 @@ def apply_keyword_rules(transactions: list[Transaction], settings: Settings) -> 
                     s,
                 )
                 continue
-            tx.primary_category = p
-            tx.secondary_category = s
-            break
+            tx.tags = _merge_tags(tx.tags, rule.tags)
+            if tx.primary_category is None:
+                tx.primary_category = p
+                tx.secondary_category = s

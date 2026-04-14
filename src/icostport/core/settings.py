@@ -58,6 +58,7 @@ class RuleConfig(BaseModel):
     keywords: list[str] = Field(default_factory=list)
     primary: str
     secondary: str
+    tags: list[str] = Field(default_factory=list)
 
     model_config = ConfigDict(extra="forbid")
 
