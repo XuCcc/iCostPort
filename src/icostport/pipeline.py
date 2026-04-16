@@ -63,8 +63,15 @@ def run(
 
     txs = sort_by_time(txs)
 
-    apply_keyword_rules(txs, settings)
-    run_ai_categorize(txs, settings)
+    total_txs = len(txs)
+    rules_assigned = apply_keyword_rules(txs, settings)
+    ai_assigned = run_ai_categorize(txs, settings, verbose=verbose)
+    logger.info(
+        "分类统计：共 {} 条账单，{} 条由 rules 分类，{} 条由 AI 分类。",
+        total_txs,
+        rules_assigned,
+        ai_assigned,
+    )
 
     rows = [transaction_to_icost_row(t) for t in txs]
     write_icost_workbook(output, rows)

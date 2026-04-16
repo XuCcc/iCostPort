@@ -45,13 +45,15 @@ def _merge_tags(existing: str, tags: list[str]) -> str:
     return "".join(f"#{t}" for t in existed)
 
 
-def apply_keyword_rules(transactions: list[Transaction], settings: Settings) -> None:
+def apply_keyword_rules(transactions: list[Transaction], settings: Settings) -> int:
     """
     按 ``settings.rules`` 顺序匹配：``keywords`` 在 ``note`` 中子串命中（大小写不敏感）则写入一级/二级和 tags。
     若 ``categories`` 非空，则校验 (primary, secondary) 须在白名单内，否则记警告并跳过该条规则结果。
+    返回实际分类成功的交易数量。
     """
     pairs = build_category_pairs(settings.categories)
     nonempty = bool(settings.categories)
+    assigned = 0
 
     for tx in transactions:
         note_l = tx.note.lower()
@@ -71,3 +73,5 @@ def apply_keyword_rules(transactions: list[Transaction], settings: Settings) -> 
             if tx.primary_category is None:
                 tx.primary_category = p
                 tx.secondary_category = s
+                assigned += 1
+    return assigned
