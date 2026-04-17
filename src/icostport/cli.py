@@ -46,18 +46,39 @@ def cli(ctx: click.Context, verbose: bool) -> None:
     required=True,
     help="输出 .xlsx 路径。",
 )
+@click.option(
+    "--account-parse/--no-account-parse",
+    default=False,
+    help=(
+        "是否解析输出账单中的账户字段；默认 false，输出时 account1/account2 置空。"
+    ),
+)
+@click.option(
+    "--only-expense/--all-types",
+    default=True,
+    help="仅保留 txn_type 为 支出的记录；默认 true。",
+)
 @click.pass_context
 def convert_cmd(
     ctx: click.Context,
     paths: tuple[Path, ...],
     config: Path | None,
     output: Path,
+    account_parse: bool,
+    only_expense: bool,
 ) -> None:
     """将若干源文件转换为 ICost 可导入表格。"""
     from icostport.pipeline import run
 
     verbose = bool(ctx.obj.get("verbose"))
-    run(list(paths), output, config, verbose=verbose)
+    run(
+        list(paths),
+        output,
+        config,
+        verbose=verbose,
+        account_parse=account_parse,
+        only_expense=only_expense,
+    )
 
 
 def main() -> None:

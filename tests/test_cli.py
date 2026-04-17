@@ -27,11 +27,15 @@ def test_convert_command_invokes_pipeline_with_expected_args(
         config: Path | None,
         *,
         verbose: bool = False,
+        account_parse: bool = False,
+        only_expense: bool = True,
     ) -> None:
         captured["input_paths"] = input_paths
         captured["output"] = output
         captured["config"] = config
         captured["verbose"] = verbose
+        captured["account_parse"] = account_parse
+        captured["only_expense"] = only_expense
 
     monkeypatch.setattr("icostport.pipeline.run", fake_run)
 
@@ -54,6 +58,8 @@ def test_convert_command_invokes_pipeline_with_expected_args(
     assert captured["output"] == output_file
     assert captured["config"] == config_file
     assert captured["verbose"] is True
+    assert captured["account_parse"] is False
+    assert captured["only_expense"] is True
 
 
 def test_convert_command_accepts_multiple_input_paths(
@@ -78,11 +84,15 @@ def test_convert_command_accepts_multiple_input_paths(
         config: Path | None,
         *,
         verbose: bool = False,
+        account_parse: bool = False,
+        only_expense: bool = True,
     ) -> None:
         captured["input_paths"] = input_paths
         captured["output"] = output
         captured["config"] = config
         captured["verbose"] = verbose
+        captured["account_parse"] = account_parse
+        captured["only_expense"] = only_expense
 
     monkeypatch.setattr("icostport.pipeline.run", fake_run)
 
@@ -103,3 +113,56 @@ def test_convert_command_accepts_multiple_input_paths(
     assert captured["output"] == output_file
     assert captured["config"] is None
     assert captured["verbose"] is False
+    assert captured["account_parse"] is False
+    assert captured["only_expense"] is True
+
+
+def test_convert_command_accepts_account_parse_and_all_types_flags(
+    monkeypatch,
+    fixtures_dir: Path,
+    tmp_path: Path,
+) -> None:
+    """convert 子命令应支持 account_parse 和 all_types 参数。"""
+    sample_file = fixtures_dir / "京东账单_sample.csv"
+    output_file = tmp_path / "out.xlsx"
+
+    captured: dict[str, object] = {}
+
+    def fake_run(
+        input_paths: list[Path],
+        output: Path,
+        config: Path | None,
+        *,
+        verbose: bool = False,
+        account_parse: bool = False,
+        only_expense: bool = True,
+    ) -> None:
+        captured["input_paths"] = input_paths
+        captured["output"] = output
+        captured["config"] = config
+        captured["verbose"] = verbose
+        captured["account_parse"] = account_parse
+        captured["only_expense"] = only_expense
+
+    monkeypatch.setattr("icostport.pipeline.run", fake_run)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli_module.cli,
+        [
+            "convert",
+            str(sample_file),
+            "--output",
+            str(output_file),
+            "--account-parse",
+            "--all-types",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured["input_paths"] == [sample_file]
+    assert captured["output"] == output_file
+    assert captured["config"] is None
+    assert captured["verbose"] is False
+    assert captured["account_parse"] is True
+    assert captured["only_expense"] is False

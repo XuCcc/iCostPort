@@ -29,6 +29,8 @@ def run(
     config: Path | None,
     *,
     verbose: bool = False,
+    account_parse: bool = False,
+    only_expense: bool = True,
 ) -> None:
     """
     端到端执行：多文件解析、合并、去重、过滤、排序、规则/AI 归类、写出 xlsx。
@@ -53,6 +55,11 @@ def run(
 
     txs = merge_lists(partitions)
 
+    if not account_parse:
+        for tx in txs:
+            tx.account1 = ""
+            tx.account2 = ""
+
     dedupe_cfg = settings.processing.dedupe
     if dedupe_cfg.enabled:
         on_dup = dedupe_cfg.on_duplicate
@@ -60,6 +67,9 @@ def run(
 
     filt = settings.processing.filter or {}
     txs = apply_filters(txs, filt)
+
+    if only_expense:
+        txs = [tx for tx in txs if tx.txn_type == "支出"]
 
     txs = sort_by_time(txs)
 
