@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from pathlib import Path
 
 from loguru import logger
@@ -21,6 +22,27 @@ from icostport.sources.registry import resolve_parser
 
 # 确保内置解析器完成注册
 import icostport.sources  # noqa: F401
+
+
+def _log_bill_summary(path: Path, txs: list[Transaction]) -> None:
+    """打印已识别账单的基本信息：笔数、时间范围、收支金额合计。"""
+    if not txs:
+        logger.info("  └ {}：解析出 0 条记录", path.name)
+        return
+
+    times = [t.occurred_at for t in txs]
+    start, end = min(times), max(times)
+    expense = sum((t.amount for t in txs if t.txn_type == "支出"), Decimal(0))
+    income = sum((t.amount for t in txs if t.txn_type == "收入"), Decimal(0))
+    logger.info(
+        "  └ {}：{} 条记录，时间 {} ~ {}，支出 {} 元 / 收入 {} 元",
+        path.name,
+        len(txs),
+        start.strftime("%Y-%m-%d"),
+        end.strftime("%Y-%m-%d"),
+        expense,
+        income,
+    )
 
 
 def run(
@@ -47,8 +69,10 @@ def run(
             logger.warning("跳过未识别文件: {}（可在 sources 中新增探测器或扩展名注册）", p)
             continue
 
-        logger.info("解析: {}", p)
-        partitions.append(parser(p))
+        logger.info("识别账单: {}（解析器 {}）", p.name, parser.__name__)
+        parsed = parser(p)
+        _log_bill_summary(p, parsed)
+        partitions.append(parsed)
 
     if skipped:
         logger.warning("共跳过 {} 个未识别文件，继续处理其余输入。", skipped)

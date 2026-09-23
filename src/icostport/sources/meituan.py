@@ -9,12 +9,26 @@
 from __future__ import annotations
 
 import csv
+import io
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from icostport.core.model import Transaction
 from icostport.sources.registry import register_detector, register_parser
+
+
+def _read_text(path: Path) -> str:
+    """尝试多种编码读取美团账单文本。"""
+    for encoding in ("utf-8-sig", "utf-8", "gb18030", "gbk"):
+        try:
+            text = path.read_text(encoding=encoding)
+        except UnicodeDecodeError:
+            continue
+        if "�" in text:
+            continue
+        return text
+    return path.read_text(encoding="gb18030", errors="replace")
 
 
 def _parse_datetime(value: str) -> datetime:
@@ -50,88 +64,88 @@ def parse_meituan(path: Path) -> list[Transaction]:
     """
     out: list[Transaction] = []
 
-    with path.open(encoding="utf-8-sig", newline="") as f:
-        reader = csv.reader(f)
+    text = _read_text(path)
+    reader = csv.reader(io.StringIO(text))
 
-        # 跳过前19行元数据
-        for _ in range(19):
-            try:
-                next(reader)
-            except StopIteration:
-                return out
-
-        # 读取第20行表头
-        header = next(reader, None)
-        if not header:
+    # 跳过前19行元数据
+    for _ in range(19):
+        try:
+            next(reader)
+        except StopIteration:
             return out
 
-        # 规范化列名
-        fields = {h.strip().lower(): h for h in header if h}
+    # 读取第20行表头
+    header = next(reader, None)
+    if not header:
+        return out
 
-        def col(name: str) -> str | None:
-            return fields.get(name.lower())
+    # 规范化列名
+    fields = {h.strip().lower(): h for h in header if h}
 
-        # 定位关键列
-        c_date = col("交易成功时间")
-        c_amount = col("实付金额")
-        c_type = col("收/支")
-        c_title = col("订单标题")
-        c_account = col("支付方式")
-        c_note = col("备注")
+    def col(name: str) -> str | None:
+        return fields.get(name.lower())
 
-        if not c_date or not c_amount or not c_type:
-            msg = "美团账单缺少必要列（交易成功时间/实付金额/收/支）"
-            raise ValueError(msg)
+    # 定位关键列
+    c_date = col("交易成功时间")
+    c_amount = col("实付金额")
+    c_type = col("收/支")
+    c_title = col("订单标题")
+    c_account = col("支付方式")
+    c_note = col("备注")
 
-        # 解析数据行
-        for row in reader:
-            # 跳过空行
-            if not any(cell.strip() for cell in row):
-                continue
+    if not c_date or not c_amount or not c_type:
+        msg = "美团账单缺少必要列（交易成功时间/实付金额/收/支）"
+        raise ValueError(msg)
 
-            date_idx = header.index(c_date)
-            raw_date = (row[date_idx] if date_idx < len(row) else "").strip()
-            if not raw_date:
-                continue
+    # 解析数据行
+    for row in reader:
+        # 跳过空行
+        if not any(cell.strip() for cell in row):
+            continue
 
-            amount_idx = header.index(c_amount)
-            raw_amt = (row[amount_idx] if amount_idx < len(row) else "").strip()
-            if not raw_amt:
-                continue
+        date_idx = header.index(c_date)
+        raw_date = (row[date_idx] if date_idx < len(row) else "").strip()
+        if not raw_date:
+            continue
 
-            type_idx = header.index(c_type)
-            raw_type = (row[type_idx] if type_idx < len(row) else "").strip()
+        amount_idx = header.index(c_amount)
+        raw_amt = (row[amount_idx] if amount_idx < len(row) else "").strip()
+        if not raw_amt:
+            continue
 
-            # 解析交易类型：支出/收入
-            txn_type = "支出" if "支出" in raw_type else "收入"
+        type_idx = header.index(c_type)
+        raw_type = (row[type_idx] if type_idx < len(row) else "").strip()
 
-            # 组合备注：订单标题 + 备注
-            title = ""
-            if c_title:
-                title_idx = header.index(c_title)
-                title = (row[title_idx] if title_idx < len(row) else "").strip()
+        # 解析交易类型：支出/收入
+        txn_type = "支出" if "支出" in raw_type else "收入"
 
-            note_field = ""
-            if c_note:
-                note_idx = header.index(c_note)
-                note_field = (row[note_idx] if note_idx < len(row) else "").strip()
-                # 美团的"/"表示空备注
-                if note_field == "/":
-                    note_field = ""
+        # 组合备注：订单标题 + 备注
+        title = ""
+        if c_title:
+            title_idx = header.index(c_title)
+            title = (row[title_idx] if title_idx < len(row) else "").strip()
 
-            note = f"{title} {note_field}".strip()
+        note_field = ""
+        if c_note:
+            note_idx = header.index(c_note)
+            note_field = (row[note_idx] if note_idx < len(row) else "").strip()
+            # 美团的"/"表示空备注
+            if note_field == "/":
+                note_field = ""
 
-            tx = Transaction(
-                occurred_at=_parse_datetime(raw_date),
-                amount=_parse_amount(raw_amt),
-                txn_type=txn_type,
-                note=note,
-                account1="",
-                account2="",
-                currency="CNY",
-                source_path=path,
-            )
-            out.append(tx)
+        note = f"{title} {note_field}".strip()
+
+        tx = Transaction(
+            occurred_at=_parse_datetime(raw_date),
+            amount=_parse_amount(raw_amt),
+            txn_type=txn_type,
+            note=note,
+            account1="",
+            account2="",
+            currency="CNY",
+            source_path=path,
+        )
+        out.append(tx)
 
     return out
 
@@ -145,9 +159,9 @@ def detect_meituan_by_name(path: Path) -> bool:
 def detect_meituan_by_content(path: Path) -> bool:
     """通过第一行内容识别美团账单。"""
     try:
-        with path.open(encoding="utf-8-sig", newline="") as f:
-            first_line = f.readline().strip()
-            return "美团" in first_line
+        text = _read_text(path)
+        first_line = text.splitlines()[0] if text else ""
+        return "美团" in first_line
     except OSError:
         return False
 

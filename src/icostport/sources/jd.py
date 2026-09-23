@@ -9,12 +9,26 @@
 from __future__ import annotations
 
 import csv
+import io
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from icostport.core.model import Transaction
 from icostport.sources.registry import register_detector, register_parser
+
+
+def _read_text(path: Path) -> str:
+    """尝试多种编码读取京东账单文本。"""
+    for encoding in ("utf-8-sig", "utf-8", "gb18030", "gbk"):
+        try:
+            text = path.read_text(encoding=encoding)
+        except UnicodeDecodeError:
+            continue
+        if "�" in text:
+            continue
+        return text
+    return path.read_text(encoding="gb18030", errors="replace")
 
 
 def _parse_datetime(value: str) -> datetime:
@@ -46,90 +60,90 @@ def parse_jd(path: Path) -> list[Transaction]:
     """
     out: list[Transaction] = []
 
-    with path.open(encoding="utf-8-sig", newline="") as f:
-        reader = csv.reader(f)
+    text = _read_text(path)
+    reader = csv.reader(io.StringIO(text))
 
-        # 跳过前21行元数据
-        for _ in range(21):
-            try:
-                next(reader)
-            except StopIteration:
-                return out
-
-        # 读取第22行表头
-        header = next(reader, None)
-        if not header:
+    # 跳过前21行元数据
+    for _ in range(21):
+        try:
+            next(reader)
+        except StopIteration:
             return out
 
-        # 规范化列名
-        fields = {h.strip().lower(): h for h in header if h}
+    # 读取第22行表头
+    header = next(reader, None)
+    if not header:
+        return out
 
-        def col(name: str) -> str | None:
-            return fields.get(name.lower())
+    # 规范化列名
+    fields = {h.strip().lower(): h for h in header if h}
 
-        # 定位关键列
-        c_date = col("交易时间")
-        c_amount = col("金额")
-        c_type = col("收/支")
-        c_merchant = col("商户名称")
-        c_description = col("交易说明")
-        c_note = col("备注")
+    def col(name: str) -> str | None:
+        return fields.get(name.lower())
 
-        if not c_date or not c_amount or not c_type:
-            msg = "京东账单缺少必要列（交易时间/金额/收/支）"
-            raise ValueError(msg)
+    # 定位关键列
+    c_date = col("交易时间")
+    c_amount = col("金额")
+    c_type = col("收/支")
+    c_merchant = col("商户名称")
+    c_description = col("交易说明")
+    c_note = col("备注")
 
-        # 解析数据行
-        for row in reader:
-            # 跳过空行
-            if not any(cell.strip() for cell in row):
-                continue
+    if not c_date or not c_amount or not c_type:
+        msg = "京东账单缺少必要列（交易时间/金额/收/支）"
+        raise ValueError(msg)
 
-            date_idx = header.index(c_date)
-            raw_date = (row[date_idx] if date_idx < len(row) else "").strip()
-            if not raw_date:
-                continue
+    # 解析数据行
+    for row in reader:
+        # 跳过空行
+        if not any(cell.strip() for cell in row):
+            continue
 
-            amount_idx = header.index(c_amount)
-            raw_amt = (row[amount_idx] if amount_idx < len(row) else "").strip()
-            if not raw_amt:
-                continue
+        date_idx = header.index(c_date)
+        raw_date = (row[date_idx] if date_idx < len(row) else "").strip()
+        if not raw_date:
+            continue
 
-            type_idx = header.index(c_type)
-            raw_type = (row[type_idx] if type_idx < len(row) else "").strip()
+        amount_idx = header.index(c_amount)
+        raw_amt = (row[amount_idx] if amount_idx < len(row) else "").strip()
+        if not raw_amt:
+            continue
 
-            # 解析交易类型：支出/收入
-            txn_type = "支出" if "支出" in raw_type else "收入"
+        type_idx = header.index(c_type)
+        raw_type = (row[type_idx] if type_idx < len(row) else "").strip()
 
-            # 组合备注：商户名称 + 交易说明 + 备注
-            merchant = ""
-            if c_merchant:
-                merchant_idx = header.index(c_merchant)
-                merchant = (row[merchant_idx] if merchant_idx < len(row) else "").strip()
+        # 解析交易类型：支出/收入
+        txn_type = "支出" if "支出" in raw_type else "收入"
 
-            description = ""
-            if c_description:
-                desc_idx = header.index(c_description)
-                description = (row[desc_idx] if desc_idx < len(row) else "").strip()
+        # 组合备注：商户名称 + 交易说明 + 备注
+        merchant = ""
+        if c_merchant:
+            merchant_idx = header.index(c_merchant)
+            merchant = (row[merchant_idx] if merchant_idx < len(row) else "").strip()
 
-            note_field = ""
-            if c_note:
-                note_idx = header.index(c_note)
-                note_field = (row[note_idx] if note_idx < len(row) else "").strip()
+        description = ""
+        if c_description:
+            desc_idx = header.index(c_description)
+            description = (row[desc_idx] if desc_idx < len(row) else "").strip()
 
-            note = f"{merchant} {description} {note_field}".strip()
+        note_field = ""
+        if c_note:
+            note_idx = header.index(c_note)
+            note_field = (row[note_idx] if note_idx < len(row) else "").strip()
 
-            tx = Transaction(
-                occurred_at=_parse_datetime(raw_date),
-                amount=_parse_amount(raw_amt),
-                txn_type=txn_type,
-                note=note,
-                account1="",
-                account2="",
-                currency="CNY",
-                source_path=path,
-            )
-            out.append(tx)
+        note = f"{merchant} {description} {note_field}".strip()
+
+        tx = Transaction(
+            occurred_at=_parse_datetime(raw_date),
+            amount=_parse_amount(raw_amt),
+            txn_type=txn_type,
+            note=note,
+            account1="",
+            account2="",
+            currency="CNY",
+            source_path=path,
+        )
+        out.append(tx)
 
     return out
 
@@ -143,12 +157,9 @@ def detect_jd_by_name(path: Path) -> bool:
 def detect_jd_by_content(path: Path) -> bool:
     """通过第二行内容识别京东账单。"""
     try:
-        with path.open(encoding="utf-8-sig", newline="") as f:
-            # 跳过第一行
-            f.readline()
-            # 检查第二行
-            second_line = f.readline().strip()
-            return "京东" in second_line
+        text = _read_text(path)
+        lines = text.splitlines()
+        return len(lines) >= 2 and "京东" in lines[1]
     except OSError:
         return False
 
